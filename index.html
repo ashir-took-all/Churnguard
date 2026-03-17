@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChurnGuard - Revenue Recovery</title>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .animate-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // Simple Icon Wrapper for Single File (using SVG paths)
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            useEffect(() => {
+                lucide.createIcons();
+            }, []);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        const DAYS_THRESHOLD = 30;
+
+        const INITIAL_CUSTOMERS = [
+            { id: 1, name: "Bilal Ahmed", email: "bilal.a@example.pk", phone: "923001112223", lastOrderDate: "2026-01-05", totalSpent: 184320, orders: 15 },
+            { id: 2, name: "Sara Noor", email: "sara.n@example.pk", phone: "923214445556", lastOrderDate: "2025-12-10", totalSpent: 142150, orders: 4 },
+            { id: 3, name: "Hamza Malik", email: "hamza.m@example.pk", phone: "923335557778", lastOrderDate: "2026-01-20", totalSpent: 128400, orders: 8 },
+            { id: 4, name: "Aisha Khan", email: "aisha.k@example.pk", phone: "923458889990", lastOrderDate: "2026-03-10", totalSpent: 92300, orders: 28 },
+            { id: 5, name: "Usman Tariq", email: "usman.t@example.pk", phone: "923121113334", lastOrderDate: "2025-11-20", totalSpent: 213400, orders: 12 },
+            { id: 6, name: "Hiba Javed", email: "hiba.j@example.pk", phone: "923225556667", lastOrderDate: "2026-01-12", totalSpent: 134200, orders: 3 },
+            { id: 7, name: "Rizwan Ali", email: "rizwan.a@example.pk", phone: "923009998887", lastOrderDate: "2026-02-05", totalSpent: 156700, orders: 14 },
+            { id: 8, name: "Maryam Siddiqui", email: "maryam.s@example.pk", phone: "923212223334", lastOrderDate: "2025-10-15", totalSpent: 89400, orders: 22 },
+            { id: 9, name: "Hassan Raza", email: "hassan.r@example.pk", phone: "923334445551", lastOrderDate: "2026-01-05", totalSpent: 112350, orders: 6 },
+            { id: 10, name: "Sana Gul", email: "sana.g@example.pk", phone: "923451110009", lastOrderDate: "2026-02-14", totalSpent: 75200, orders: 18 },
+            { id: 11, name: "Zainab Bibi", email: "zainab.b@example.pk", phone: "923005556667", lastOrderDate: "2026-03-12", totalSpent: 45000, orders: 5 },
+            { id: 12, name: "Omar Sheikh", email: "omar.s@example.pk", phone: "923121112223", lastOrderDate: "2026-03-15", totalSpent: 125000, orders: 25 },
+            { id: 13, name: "Faiza Munir", email: "faiza.m@example.pk", phone: "923447778889", lastOrderDate: "2026-01-25", totalSpent: 162450, orders: 9 },
+            { id: 14, name: "Kashif Jameel", email: "k.jameel@example.pk", phone: "923312224445", lastOrderDate: "2025-12-30", totalSpent: 184200, orders: 31 },
+            { id: 15, name: "Nadia Pervez", email: "nadia.p@example.pk", phone: "923218887776", lastOrderDate: "2026-03-08", totalSpent: 53100, orders: 7 },
+        ];
+
+        function App() {
+            const [view, setView] = useState('dashboard');
+            const [isUploading, setIsUploading] = useState(false);
+            const [searchQuery, setSearchQuery] = useState("");
+            const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+
+            const today = new Date("2026-03-17");
+
+            const retentionData = useMemo(() => {
+                return INITIAL_CUSTOMERS.map(c => {
+                    const lastDate = new Date(c.lastOrderDate);
+                    const diffTime = today - lastDate;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return {
+                        ...c,
+                        daysInactive: diffDays,
+                        isAtRisk: diffDays >= DAYS_THRESHOLD,
+                        suggestedCode: `SAVE10-${c.name.split(' ')[0].toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`
+                    };
+                });
+            }, []);
+
+            const atRiskCustomers = retentionData.filter(c => c.isAtRisk);
+            const filteredCustomers = retentionData.filter(c => 
+                c.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            const stats = {
+                total: retentionData.length,
+                atRiskCount: atRiskCustomers.length,
+                revenueAtRisk: atRiskCustomers.reduce((acc, curr) => acc + curr.totalSpent, 0),
+                retentionRate: (((retentionData.length - atRiskCustomers.length) / retentionData.length) * 100).toFixed(1)
+            };
+
+            const generateWhatsAppUrl = (customer) => {
+                const message = `Hi ${customer.name}! We've missed you. Here is a special 10% discount for your next order: ${customer.suggestedCode}. Use it at checkout!`;
+                return `https://wa.me/${customer.phone}?text=${encodeURIComponent(message)}`;
+            };
+
+            const SidebarItem = ({ id, icon, label }) => (
+                <button 
+                    onClick={() => setView(id)}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
+                        view === id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800'
+                    }`}
+                >
+                    <Icon name={icon} />
+                    <span className="font-medium">{label}</span>
+                </button>
+            );
+
+            return (
+                <div className="flex flex-col md:flex-row min-h-screen bg-slate-950 text-slate-100">
+                    
+                    {/* Pricing Modal */}
+                    {isPricingModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                            <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-4xl p-8 relative animate-in text-left">
+                                <button onClick={() => setIsPricingModalOpen(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white">
+                                    <Icon name="x" className="w-6 h-6" />
+                                </button>
+                                <div className="text-center mb-10">
+                                    <h2 className="text-3xl font-bold">Choose your plan</h2>
+                                    <p className="text-slate-400 mt-2">Scale your retention strategy with ChurnGuard Pro</p>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-8">
+                                    <div className="border border-slate-800 bg-slate-800/30 rounded-2xl p-8">
+                                        <h3 className="text-lg font-bold">Starter</h3>
+                                        <div className="mt-4 flex items-baseline">
+                                            <span className="text-4xl font-extrabold">$0</span><span className="ml-1 text-slate-500">/month</span>
+                                        </div>
+                                        <button disabled className="w-full mt-8 py-3 rounded-xl font-bold border border-slate-700 text-slate-500">Current Plan</button>
+                                    </div>
+                                    <div className="border-2 border-indigo-500 bg-indigo-500/5 rounded-2xl p-8 relative">
+                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-500 text-white px-4 py-1 rounded-full text-xs font-bold uppercase">Most Popular</div>
+                                        <h3 className="text-lg font-bold">Pro</h3>
+                                        <div className="mt-4 flex items-baseline">
+                                            <span className="text-4xl font-extrabold">$100</span><span className="ml-1 text-slate-500">/month</span>
+                                        </div>
+                                        <button onClick={() => alert("Redirecting to checkout...")} className="w-full mt-8 py-3 rounded-xl font-bold bg-indigo-600 text-white shadow-lg">Upgrade to Pro</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sidebar */}
+                    <aside className="w-full md:w-64 bg-slate-900/50 border-r border-slate-800 p-6 space-y-8 flex flex-col">
+                        <div className="flex items-center space-x-3 text-indigo-400">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                                <path d="M12 2a10 10 0 1 0 10 10" />
+                                <path d="M12 6a6 6 0 1 0 6 6" />
+                                <path d="M12 10a2 2 0 1 0 2 2" />
+                                <path d="M22 2l-4.5 4.5" />
+                                <path d="M21 2h-4" />
+                                <path d="M22 2v4" />
+                            </svg>
+                            <span className="text-xl font-bold tracking-tight text-white">ChurnGuard</span>
+                        </div>
+                        <div className="space-y-6">
+                            <nav className="space-y-2">
+                                <SidebarItem id="dashboard" icon="layout-dashboard" label="Dashboard" />
+                                <SidebarItem id="upload" icon="upload" label="Import Orders" />
+                                <SidebarItem id="drafts" icon="message-square" label="Auto-Drafts" />
+                            </nav>
+                            <div className="bg-slate-800 rounded-2xl p-5 border border-slate-700/50 text-left">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Current Plan</p>
+                                <p className="text-sm font-bold text-slate-200 mb-4">Free Tier</p>
+                                <button onClick={() => setIsPricingModalOpen(true)} className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl flex items-center justify-center">
+                                    <Icon name="zap" className="w-3 h-3 mr-2" /> Upgrade to Pro
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 p-4 md:p-10 overflow-y-auto">
+                        <header className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6 text-left">
+                            <div>
+                                <h1 className="text-3xl font-bold text-white tracking-tight">
+                                    {view === 'dashboard' ? "Retention Analytics" : view === 'upload' ? "Data Sync" : "Automated Campaigns"}
+                                </h1>
+                                <p className="text-slate-400 mt-1 font-medium italic">
+                                    {view === 'dashboard' ? "Scale your business with automated re-engagement." : `Monitoring Rs. ${stats.revenueAtRisk.toLocaleString()} in potential recovery revenue.`}
+                                </p>
+                            </div>
+                            <div className="relative group">
+                                <input 
+                                    type="text" 
+                                    placeholder="Search database..."
+                                    className="pl-4 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm w-full md:w-72 outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </header>
+
+                        {view === 'dashboard' && (
+                            <div className="space-y-8 animate-in text-left">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    {[
+                                        { label: 'Total Base', val: stats.total, icon: 'users', color: 'text-blue-400', bg: 'bg-blue-400/10' },
+                                        { label: 'Churn Risk', val: stats.atRiskCount, icon: 'alert-circle', color: 'text-rose-400', bg: 'bg-rose-400/10' },
+                                        { label: 'Retention Rate', val: `${stats.retentionRate}%`, icon: 'check-circle-2', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                                        { label: 'Revenue at Risk', val: `Rs. ${stats.revenueAtRisk.toLocaleString()}`, icon: 'arrow-up-right', color: 'text-amber-400', bg: 'bg-amber-400/10' },
+                                    ].map((stat, i) => (
+                                        <div key={i} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-sm">
+                                            <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-5`}>
+                                                <Icon name={stat.icon} />
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-500 tracking-wide">{stat.label}</p>
+                                            <p className="text-2xl font-bold text-white mt-1 tracking-tight">{stat.val}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
+                                    <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                                        <h3 className="font-bold text-white">Customer Risk Report</h3>
+                                        <button className="text-indigo-400 text-sm font-bold flex items-center hover:text-indigo-300">
+                                            <Icon name="download" className="w-4 h-4 mr-2" /> Download CSV
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-800/50 text-slate-400 text-[10px] uppercase tracking-widest">
+                                                <tr>
+                                                    <th className="px-6 py-4 font-bold">Identity</th>
+                                                    <th className="px-6 py-4 font-bold">Last Purchase</th>
+                                                    <th className="px-6 py-4 font-bold">Status</th>
+                                                    <th className="px-6 py-4 font-bold text-right">LTV (PKR)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/50">
+                                                {filteredCustomers.map((customer) => (
+                                                    <tr key={customer.id} className="hover:bg-slate-800/30 transition-colors text-sm">
+                                                        <td className="px-6 py-5">
+                                                            <div className="flex items-center space-x-3">
+                                                                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/20">{customer.name.charAt(0)}</div>
+                                                                <div><p className="font-bold text-slate-200">{customer.name}</p><p className="text-xs text-slate-500">{customer.email}</p></div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-5 text-slate-400 font-medium">{customer.lastOrderDate}</td>
+                                                        <td className="px-6 py-5">
+                                                            {customer.isAtRisk ? (
+                                                                <span className="bg-rose-500/10 text-rose-400 border border-rose-500/20 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">At Risk</span>
+                                                            ) : (
+                                                                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">Healthy</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-5 text-right font-bold text-white">Rs. {customer.totalSpent.toLocaleString()}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'upload' && (
+                            <div className="max-w-2xl mx-auto mt-20 bg-slate-900 border border-slate-800 border-dashed rounded-[2.5rem] p-20 text-center animate-in">
+                                <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-indigo-500/20">
+                                    <Icon name="upload" className="w-10 h-10 text-indigo-400" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-white mb-3">Sync Order History</h3>
+                                <p className="text-slate-500 mb-10">Upload your CSV or Excel files to automatically calculate churn risk.</p>
+                                <button onClick={() => alert("Simulating upload...")} className="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-4 rounded-2xl font-bold shadow-2xl">Select Master File</button>
+                            </div>
+                        )}
+
+                        {view === 'drafts' && (
+                            <div className="space-y-8 animate-in text-left">
+                                <div className="bg-gradient-to-r from-indigo-950 to-indigo-900 border border-indigo-500/30 rounded-[2rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl">
+                                    <div className="space-y-3">
+                                        <h3 className="text-2xl font-bold tracking-tight">Revenue Recovery Engine</h3>
+                                        <p className="text-indigo-200/80 max-w-md font-medium text-lg leading-relaxed">
+                                            You have <span className="text-white font-bold underline decoration-indigo-400 underline-offset-4">Rs. {stats.revenueAtRisk.toLocaleString()}</span> in inactive accounts.
+                                        </p>
+                                    </div>
+                                    <button onClick={() => setIsPricingModalOpen(true)} className="bg-white text-indigo-900 px-8 py-4 rounded-2xl font-bold flex items-center hover:bg-slate-100 shadow-xl text-lg">
+                                        <Icon name="zap" className="w-5 h-5 mr-3" /> Auto-Send All (Pro)
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-5">
+                                    {atRiskCustomers.map((customer) => (
+                                        <div key={customer.id} className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-8 group hover:border-slate-700 transition-all">
+                                            <div className="flex items-start space-x-5">
+                                                <div className="w-14 h-14 rounded-2xl bg-slate-800 text-slate-400 font-bold flex items-center justify-center border border-slate-700 group-hover:border-indigo-500/50 group-hover:bg-indigo-500/10 group-hover:text-indigo-400 transition-all text-xl">{customer.name.charAt(0)}</div>
+                                                <div>
+                                                    <h4 className="font-bold text-white text-lg">{customer.name}</h4>
+                                                    <p className="text-sm font-bold text-rose-400/80 uppercase tracking-widest mt-1">{customer.daysInactive} Days Inactive</p>
+                                                    <p className="text-xs text-slate-500 mt-1 italic">High Potential: Rs. {customer.totalSpent.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50 text-slate-300 text-sm italic leading-relaxed">
+                                                "Hi {customer.name}! We've missed you. Here is a special 10% discount: <b className="text-indigo-400">{customer.suggestedCode}</b>"
+                                            </div>
+                                            <a href={generateWhatsAppUrl(customer)} target="_blank" className="bg-emerald-600 hover:bg-emerald-500 text-white px-7 py-3.5 rounded-2xl font-bold text-sm flex items-center shadow-lg whitespace-nowrap">
+                                                <Icon name="message-square" className="w-5 h-5 mr-3" /> Start Recovery
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
